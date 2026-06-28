@@ -3,6 +3,7 @@ package main
 import (
 	"go-backend/internal/config"
 	"go-backend/internal/handlers"
+	"go-backend/internal/migrations"
 	"go-backend/internal/models"
 	"log"
 
@@ -11,7 +12,7 @@ import (
 
 func main() {
 	config.ConnectDatabase()
-	if err := config.DB.AutoMigrate(&models.Student{}); err != nil {
+	if err := migrations.RunMigrations(); err != nil {
 		log.Fatal("Не удалось выполнить миграцию базы данных:", err)
 	}
 	if err := initData(); err != nil {
