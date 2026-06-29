@@ -18,14 +18,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupTestDB(t *testing.T) {
+func setupTestDBs(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&models.Student{}))
 	config.DB = db
 }
 
-func TestStudentRepository_CreateGetUpdateDelete(t *testing.T) {
+func TestStudentRepository_CreateGetUpdateDeleteStudent(t *testing.T) {
 	setupTestDB(t)
 
 	repo := &repository.StudentRepository{}
@@ -62,7 +62,7 @@ func TestStudentRepository_CreateGetUpdateDelete(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestStudentRepository_FilterByGroup(t *testing.T) {
+func TestStudentRepository_FilterByGroupStydent(t *testing.T) {
 	setupTestDB(t)
 
 	repo := &repository.StudentRepository{}
