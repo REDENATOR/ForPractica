@@ -18,13 +18,15 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupTestDBs(t *testing.T) {
+// setupTestDB создаёт временную базу данных в памяти для каждого теста.
+func setupTestDB(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&models.Student{}))
 	config.DB = db
 }
 
+// TestStudentRepository_CreateGetUpdateDeleteStudent проверяет CRUD-операции для репозитория студентов.
 func TestStudentRepository_CreateGetUpdateDeleteStudent(t *testing.T) {
 	setupTestDB(t)
 
@@ -62,6 +64,7 @@ func TestStudentRepository_CreateGetUpdateDeleteStudent(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestStudentRepository_FilterByGroupStydent проверяет фильтрацию студентов по группе.
 func TestStudentRepository_FilterByGroupStydent(t *testing.T) {
 	setupTestDB(t)
 
@@ -78,6 +81,7 @@ func TestStudentRepository_FilterByGroupStydent(t *testing.T) {
 	}
 }
 
+// TestStudentHandler_GetAllStudents проверяет, что обработчик возвращает список студентов с кодом 200.
 func TestStudentHandler_GetAllStudents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	setupTestDB(t)
@@ -99,6 +103,7 @@ func TestStudentHandler_GetAllStudents(t *testing.T) {
 	require.Equal(t, "Ivan Ivanov", students[0].Fio)
 }
 
+// TestStudentHandler_CreateStudent проверяет создание студента через HTTP-обработчик.
 func TestStudentHandler_CreateStudent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	setupTestDB(t)
@@ -125,6 +130,7 @@ func TestStudentHandler_CreateStudent(t *testing.T) {
 	require.NotZero(t, created.ID)
 }
 
+// TestStudentHandler_GetByID_NotFoundReturns404 проверяет поведение обработчика, когда студента не существует.
 func TestStudentHandler_GetByID_NotFoundReturns404(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	setupTestDB(t)
