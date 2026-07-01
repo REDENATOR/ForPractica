@@ -13,7 +13,7 @@ import (
 func RunMigrations() error {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		dbURL = "postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
+		dbURL = "postgres://myuser:mypassword@localhost:5433/myapp?sslmode=disable"
 	}
 
 	m, err := migrate.New(

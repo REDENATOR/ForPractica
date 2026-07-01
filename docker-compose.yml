@@ -1,0 +1,35 @@
+services:
+  # Сервис базы данных
+  db:
+    image: postgres:17-alpine          # alpine — лёгкая версия
+    container_name: myapp-db
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: myapp
+    ports:
+      - "5433:5432"                    # проброс хоста 5433 на порт контейнера 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:                       # проверка, что БД готова к работе
+      test: ["CMD-SHELL", "pg_isready -U myuser -d myapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # (опционально) Админка для БД — pgAdmin
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: myapp-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  postgres_data:     # именованный том для сохранения данных

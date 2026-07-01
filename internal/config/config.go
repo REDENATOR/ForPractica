@@ -14,7 +14,7 @@ var DB *gorm.DB
 // ConnectDatabase устанавливает подключение к PostgreSQL и сохраняет его в глобальную переменную DB.
 func ConnectDatabase() {
 	// Настройка строки подключения к базе данных.
-	dsn := "host=localhost user=postgres password=1234 dbname=test port=5432 sslmode=disable"
+	dsn := "host=localhost user=myuser password=mypassword dbname=myapp port=5433 sslmode=disable"
 
 	// Открываем соединение с базой данных через GORM.
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
