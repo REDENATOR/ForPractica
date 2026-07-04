@@ -12,13 +12,14 @@ import (
 
 // StudentHandler обрабатывает запросы, связанные со студентами.
 type StudentHandler struct {
-	repo *repository.StudentRepository
+	repo *repository.UserRepository
+	uc   UserINterface
 }
 
 // NewStudentHandler возвращает новый экземпляр StudentHandler.
 func NewStudentHandler() *StudentHandler {
 	return &StudentHandler{
-		repo: &repository.StudentRepository{},
+		repo: &repository.UserRepository{},
 	}
 }
 
@@ -206,4 +207,3 @@ func (h *StudentHandler) Search(c *gin.Context) {
 	query.Find(&students)
 	c.JSON(http.StatusOK, students)
 }
-
