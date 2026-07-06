@@ -1,2 +1,2 @@
-DROP INDEX idx_students_role;
-ALTER TABLE students DROP COLUMN role;
+DROP INDEX idx_users_role;
+ALTER TABLE users DROP COLUMN role;

@@ -18,18 +18,18 @@ func NewStudentService(repo *repository.UserRepository) *StudentService {
 	return &StudentService{repo: repo}
 }
 
-func (s *StudentService) GetAll() ([]models.Student, error) {
+func (s *StudentService) GetAll() ([]models.User, error) {
 	return s.repo.GetAll()
 }
 
-func (s *StudentService) Create(student *models.Student) error {
+func (s *StudentService) Create(student *models.User) error {
 	return s.repo.Create(student)
 }
 
-func (s *StudentService) Update(id uint, updated models.Student) (models.Student, error) {
+func (s *StudentService) Update(id uint, updated models.User) (models.User, error) {
 	existing, err := s.repo.GetByID(id)
 	if err != nil {
-		return models.Student{}, err
+		return models.User{}, err
 	}
 
 	existing.Fio = updated.Fio
@@ -37,7 +37,7 @@ func (s *StudentService) Update(id uint, updated models.Student) (models.Student
 	existing.PhoneNumber = updated.PhoneNumber
 
 	if err := s.repo.Update(&existing); err != nil {
-		return models.Student{}, err
+		return models.User{}, err
 	}
 
 	return existing, nil
@@ -47,25 +47,25 @@ func (s *StudentService) Delete(id uint) error {
 	return s.repo.Delete(id)
 }
 
-func (s *StudentService) GetByID(id uint) (models.Student, error) {
+func (s *StudentService) GetByID(id uint) (models.User, error) {
 	return s.repo.GetByID(id)
 }
 
-func (s *StudentService) FilterByGroup(group string) ([]models.Student, error) {
+func (s *StudentService) FilterByGroup(group string) ([]models.User, error) {
 	return s.repo.FilterByGroup(group)
 }
 
-func (s *StudentService) FilterByGroupOptional(group string) ([]models.Student, error) {
+func (s *StudentService) FilterByGroupOptional(group string) ([]models.User, error) {
 	if group == "" {
 		return s.repo.GetAll()
 	}
 	return s.repo.FilterByGroup(group)
 }
 
-func (s *StudentService) GetPaginated(page, limit int) ([]models.Student, int64, error) {
+func (s *StudentService) GetPaginated(page, limit int) ([]models.User, int64, error) {
 	return s.repo.GetPaginated(page, limit)
 }
 
-func (s *StudentService) Search(group, name string) ([]models.Student, error) {
+func (s *StudentService) Search(group, name string) ([]models.User, error) {
 	return s.repo.Search(group, name)
 }

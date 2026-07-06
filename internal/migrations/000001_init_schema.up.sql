@@ -1,6 +1,6 @@
--- Создаём таблицу студентов (соответствует модели)
-CREATE TABLE IF NOT EXISTS students (
-    -- gorm.Model поля
+-- Create users table (GORM model)
+CREATE TABLE IF NOT EXISTS users (
+    -- gorm.Model fields
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -11,12 +11,12 @@ CREATE TABLE IF NOT EXISTS students (
     phone_number TEXT
 );
 
--- Индексы для частых запросов
-CREATE INDEX idx_students_group_of_students ON students(group_of_students);
-CREATE INDEX idx_students_fio ON students(fio);
-CREATE INDEX idx_students_deleted_at ON students(deleted_at);
+-- Indexes for common queries
+CREATE INDEX idx_users_group_of_students ON users(group_of_students);
+CREATE INDEX idx_users_fio ON users(fio);
+CREATE INDEX idx_users_deleted_at ON users(deleted_at);
 
--- Триггер для обновления updated_at
+-- Function to update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -25,7 +25,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_students_updated_at
-    BEFORE UPDATE ON students
+CREATE TRIGGER update_users_updated_at
+    BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^exit\\(\\)$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
