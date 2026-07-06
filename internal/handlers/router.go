@@ -3,6 +3,8 @@ package handlers
 import (
 	"errors"
 
+	"go-backend/internal/repository"
+	"go-backend/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,7 +22,9 @@ func NewRouter(engine *gin.Engine) (*Router, error) {
 func (r *Router) RegisterRoutes() {
 	api := r.engine.Group("/api")
 	{
-		studentHandler := NewStudentHandler()
+		repo := &repository.UserRepository{}
+		studentService := service.NewStudentService(repo)
+		studentHandler := NewStudentHandler(studentService)
 
 		// Роуты для работы со студентами.
 		api.GET("/students", studentHandler.GetAll)                                // Получить всех студентов.

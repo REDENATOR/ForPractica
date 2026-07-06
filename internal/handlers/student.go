@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"go-backend/internal/config"
 	"go-backend/internal/models"
 	"go-backend/internal/repository"
+	"go-backend/internal/service"
 	"net/http"
 	"strconv"
 
@@ -12,20 +12,20 @@ import (
 
 // StudentHandler обрабатывает запросы, связанные со студентами.
 type StudentHandler struct {
-	repo *repository.UserRepository
-	uc   UserINterface
+	svc *service.StudentService
 }
 
 // NewStudentHandler возвращает новый экземпляр StudentHandler.
-func NewStudentHandler() *StudentHandler {
-	return &StudentHandler{
-		repo: &repository.UserRepository{},
+func NewStudentHandler(svc *service.StudentService) *StudentHandler {
+	if svc == nil {
+		svc = service.NewStudentService(&repository.UserRepository{})
 	}
+	return &StudentHandler{svc: svc}
 }
 
 // GetAll возвращает список всех студентов.
 func (h *StudentHandler) GetAll(c *gin.Context) {
-	students, err := h.repo.GetAll()
+	students, err := h.svc.GetAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -41,7 +41,7 @@ func (h *StudentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.Create(&student); err != nil {
+	if err := h.svc.Create(&student); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -63,21 +63,13 @@ func (h *StudentHandler) Update(c *gin.Context) {
 		return
 	}
 
-	existing, err := h.repo.GetByID(uint(id))
+	student, err := h.svc.Update(uint(id), updatedStudent)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 		return
 	}
 
-	existing.Fio = updatedStudent.Fio
-	existing.Group = updatedStudent.Group
-	existing.PhoneNumber = updatedStudent.PhoneNumber
-
-	if err := h.repo.Update(&existing); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, existing)
+	c.JSON(http.StatusOK, student)
 }
 
 // Delete удаляет студента по указанному ID.
@@ -89,7 +81,7 @@ func (h *StudentHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.Delete(uint(id)); err != nil {
+	if err := h.svc.Delete(uint(id)); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 		return
 	}
@@ -108,7 +100,7 @@ func (h *StudentHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	student, err := h.repo.GetByID(uint(id))
+	student, err := h.svc.GetByID(uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Студент не найден",
@@ -130,7 +122,7 @@ func (h *StudentHandler) FilterByGroup(c *gin.Context) {
 		return
 	}
 
-	students, err := h.repo.FilterByGroup(group)
+	students, err := h.svc.FilterByGroup(group)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -143,17 +135,12 @@ func (h *StudentHandler) FilterByGroup(c *gin.Context) {
 func (h *StudentHandler) FilterByGroupOptional(c *gin.Context) {
 	group, exists := c.GetQuery("group")
 
-	if !exists {
-		students, _ := h.repo.GetAll()
-		c.JSON(http.StatusOK, students)
-		return
-	}
-
-	students, err := h.repo.FilterByGroup(group)
+	students, err := h.svc.FilterByGroupOptional(group)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusOK, students)
 }
 
@@ -172,13 +159,11 @@ func (h *StudentHandler) GetPaginated(c *gin.Context) {
 		limit = 10
 	}
 
-	offset := page * limit
-
-	var students []models.Student
-	var total int64
-
-	config.DB.Model(&models.Student{}).Count(&total)
-	config.DB.Offset(offset).Limit(limit).Find(&students)
+	students, total, err := h.svc.GetPaginated(page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"page":  page,
@@ -193,17 +178,11 @@ func (h *StudentHandler) Search(c *gin.Context) {
 	group := c.Query("group")
 	name := c.Query("name")
 
-	var students []models.Student
-	query := config.DB
-
-	if group != "" {
-		query = query.Where("group_of_students = ?", group)
+	students, err := h.svc.Search(group, name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
-	if name != "" {
-		query = query.Where("fio LIKE ?", "%"+name+"%")
-	}
-
-	query.Find(&students)
 	c.JSON(http.StatusOK, students)
 }
