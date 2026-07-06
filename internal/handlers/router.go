@@ -2,39 +2,62 @@ package handlers
 
 import (
 	"errors"
-
+	"go-backend/internal/middlevare"
 	"go-backend/internal/repository"
 	"go-backend/internal/service"
+
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type Router struct {
 	engine *gin.Engine
+	db     *gorm.DB
 }
 
-func NewRouter(engine *gin.Engine) (*Router, error) {
+func NewRouter(engine *gin.Engine, db *gorm.DB) (*Router, error) {
 	if engine == nil {
 		return nil, errors.New("engine is nil")
 	}
-	return &Router{engine: engine}, nil
+	if db == nil {
+		return nil, errors.New("db is nil")
+	}
+	return &Router{engine: engine, db: db}, nil
 }
 
 func (r *Router) RegisterRoutes() {
+	// ============================================
+	// 1. ПУБЛИЧНЫЕ МАРШРУТЫ (без токена)
+	// ============================================
+	authHandler := NewAuthHandler(r.db)
+	auth := r.engine.Group("/auth")
+	{
+		auth.POST("/register", authHandler.Register)
+		auth.POST("/login", authHandler.Login)
+	}
+
+	// ============================================
+	// 2. ЗАЩИЩЁННЫЕ МАРШРУТЫ (с токеном)
+	// ============================================
 	api := r.engine.Group("/api")
+	api.Use(middlevare.AuthMiddleware()) // ← все маршруты ниже проверяют токен
 	{
 		repo := &repository.UserRepository{}
 		studentService := service.NewStudentService(repo)
 		studentHandler := NewStudentHandler(studentService)
+		adminHandler := NewAdminHandler(studentService)
 
-		// Роуты для работы со студентами.
-		api.GET("/students", studentHandler.GetAll)                                // Получить всех студентов.
-		api.POST("/students", studentHandler.Create)                               // Создать нового студента.
-		api.PUT("/students/:id", studentHandler.Update)                            // Обновить данные студента по ID.
-		api.DELETE("/students/:id", studentHandler.Delete)                         // Удалить студента по ID.
-		api.GET("/students/:id", studentHandler.GetByID)                           // Получить студента по ID.
-		api.GET("/students/filter", studentHandler.FilterByGroup)                  // Фильтрация студентов по группе.
-		api.GET("/students/filter-optional", studentHandler.FilterByGroupOptional) // Фильтрация с необязательным параметром.
-		api.GET("/students/paginated", studentHandler.GetPaginated)                // Получить студентов постранично.
-		api.GET("/students/search", studentHandler.Search)                         // Поиск студентов.
+		// --- Роуты для работы со студентами (только админ) ---
+		api.GET("/students", middlevare.RoleMiddleware("admin"), adminHandler.GetAll)
+		api.POST("/students", middlevare.RoleMiddleware("admin"), adminHandler.Create)
+		api.DELETE("/students/:id", middlevare.RoleMiddleware("admin"), adminHandler.Delete)
+		api.GET("/students/filter", middlevare.RoleMiddleware("admin"), adminHandler.FilterByGroup)
+		api.GET("/students/filter-optional", middlevare.RoleMiddleware("admin"), adminHandler.FilterByGroupOptional)
+		api.GET("/students/paginated", middlevare.RoleMiddleware("admin"), adminHandler.GetPaginated)
+		api.GET("/students/search", middlevare.RoleMiddleware("admin"), adminHandler.Search)
+
+		// --- Роуты для работы со студентами (студент может смотреть/редактировать только себя, админ — любого) ---
+		api.GET("/students/:id", studentHandler.GetByID) // проверка внутри хендлера
+		api.PUT("/students/:id", studentHandler.Update)  // проверка внутри хендлера
 	}
 }

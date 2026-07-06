@@ -3,7 +3,7 @@ package models
 import "gorm.io/gorm"
 
 // Student представляет запись студента в базе данных.
-type Student struct {
+type User struct {
 	gorm.Model
 
 	// Fio содержит полное имя студента.
@@ -14,9 +14,8 @@ type Student struct {
 
 	// PhoneNumber содержит контактный номер студента.
 	PhoneNumber string `json:"phoneNumber"`
-}
 
-// TableName возвращает имя таблицы для модели Student.
-func (Student) TableName() string {
-	return "students"
+	Password string `json:"password"`
+	// Не каждый пользователь студент, но каждый студент пользователь, поэтому добавим поле Role для различения ролей пользователей.
+	Role string `gorm:"type:varchar(20);not null;default:'student'"`
 }

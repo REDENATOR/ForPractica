@@ -23,72 +23,49 @@ func NewStudentHandler(svc *service.StudentService) *StudentHandler {
 	return &StudentHandler{svc: svc}
 }
 
-// GetAll возвращает список всех студентов.
-func (h *StudentHandler) GetAll(c *gin.Context) {
-	students, err := h.svc.GetAll()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+func (h *StudentHandler) authorizeSelfOrAdmin(c *gin.Context, targetUserID uint) bool {
+	currentUserID, ok := getCurrentUserID(c)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return false
 	}
-	c.JSON(http.StatusOK, students)
+
+	roleValue, exists := c.Get("role")
+	if !exists {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return false
+	}
+
+	roleStr, _ := roleValue.(string)
+	if roleStr == "admin" || currentUserID == targetUserID {
+		return true
+	}
+
+	c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden: insufficient permissions"})
+	return false
 }
 
-// Create создает нового студента на основе JSON-запроса.
-func (h *StudentHandler) Create(c *gin.Context) {
-	var student models.Student
-	if err := c.ShouldBindJSON(&student); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+func getCurrentUserID(c *gin.Context) (uint, bool) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		return 0, false
 	}
 
-	if err := h.svc.Create(&student); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	switch v := userIDValue.(type) {
+	case uint:
+		return v, true
+	case int:
+		return uint(v), true
+	case int64:
+		return uint(v), true
+	case float64:
+		return uint(v), true
+	default:
+		return 0, false
 	}
-	c.JSON(http.StatusCreated, student)
 }
 
-// Update обновляет данные существующего студента по ID.
-func (h *StudentHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-		return
-	}
-
-	var updatedStudent models.Student
-	if err := c.ShouldBindJSON(&updatedStudent); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	student, err := h.svc.Update(uint(id), updatedStudent)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, student)
-}
-
-// Delete удаляет студента по указанному ID.
-func (h *StudentHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-		return
-	}
-
-	if err := h.svc.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "Student deleted"})
-}
-
-// GetByID возвращает студента по ID.
+// GetByID returns a student by ID.
 func (h *StudentHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 
@@ -97,6 +74,10 @@ func (h *StudentHandler) GetByID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "ID должен быть числом",
 		})
+		return
+	}
+
+	if !h.authorizeSelfOrAdmin(c, uint(id)) {
 		return
 	}
 
@@ -111,78 +92,30 @@ func (h *StudentHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, student)
 }
 
-// FilterByGroup возвращает студентов, отфильтрованных по группе.
-func (h *StudentHandler) FilterByGroup(c *gin.Context) {
-	group := c.Query("group")
-
-	if group == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Параметр group обязателен. Пример: ?group=VM",
-		})
-		return
-	}
-
-	students, err := h.svc.FilterByGroup(group)
+// Update updates an existing student by ID.
+func (h *StudentHandler) Update(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
 
-	c.JSON(http.StatusOK, students)
-}
+	if !h.authorizeSelfOrAdmin(c, uint(id)) {
+		return
+	}
 
-// FilterByGroupOptional возвращает всех студентов, если параметр group не задан.
-func (h *StudentHandler) FilterByGroupOptional(c *gin.Context) {
-	group, exists := c.GetQuery("group")
+	var updatedStudent models.User
+	if err := c.ShouldBindJSON(&updatedStudent); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	students, err := h.svc.FilterByGroupOptional(group)
+	student, err := h.svc.Update(uint(id), updatedStudent)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, students)
-}
-
-// GetPaginated возвращает постраничный список студентов.
-func (h *StudentHandler) GetPaginated(c *gin.Context) {
-	pageStr := c.DefaultQuery("page", "0")
-	limitStr := c.DefaultQuery("limit", "10")
-
-	page, _ := strconv.Atoi(pageStr)
-	limit, _ := strconv.Atoi(limitStr)
-
-	if page < 0 {
-		page = 0
-	}
-	if limit < 1 || limit > 100 {
-		limit = 10
-	}
-
-	students, total, err := h.svc.GetPaginated(page, limit)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"page":  page,
-		"limit": limit,
-		"total": total,
-		"data":  students,
-	})
-}
-
-// Search ищет студентов по группе и имени.
-func (h *StudentHandler) Search(c *gin.Context) {
-	group := c.Query("group")
-	name := c.Query("name")
-
-	students, err := h.svc.Search(group, name)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, students)
+	c.JSON(http.StatusOK, student)
 }
