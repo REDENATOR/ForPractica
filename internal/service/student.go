@@ -3,14 +3,15 @@ package service
 import (
 	"go-backend/internal/models"
 	"go-backend/internal/repository"
+	"strings"
 )
 
-// StudentService содержит бизнес-логику для работы со студентами.
+// StudentService содержит бизнес-логику доступа пользователей и операций со студентами.
 type StudentService struct {
 	repo *repository.UserRepository
 }
 
-// NewStudentService создает новый сервис студентов.
+// NewStudentService создаёт новый сервис студентов.
 func NewStudentService(repo *repository.UserRepository) *StudentService {
 	if repo == nil {
 		repo = &repository.UserRepository{}
@@ -68,4 +69,51 @@ func (s *StudentService) GetPaginated(page, limit int) ([]models.User, int64, er
 
 func (s *StudentService) Search(group, name string) ([]models.User, error) {
 	return s.repo.Search(group, name)
+}
+
+// CanAccessUser проверяет, может ли текущий пользователь просматривать или редактировать целевого пользователя.
+func (s *StudentService) CanAccessUser(currentUser, targetUser models.User) bool {
+	if currentUser.Role == "admin" {
+		return true
+	}
+	if currentUser.ID != 0 && targetUser.ID != 0 && currentUser.ID == targetUser.ID {
+		return true
+	}
+	if currentUser.Role == "student" {
+		return false
+	}
+
+	if currentUser.Role != "teacher" {
+		return false
+	}
+
+	return hasAssignedGroup(currentUser.Group, targetUser.Group)
+}
+
+// FilterVisibleUsers оставляет только тех пользователей, которых преподаватель может видеть по закреплённым группам.
+func (s *StudentService) FilterVisibleUsers(currentUser models.User, users []models.User) []models.User {
+	if currentUser.Role == "admin" {
+		return users
+	}
+	if currentUser.Role != "teacher" {
+		return nil
+	}
+
+	filtered := make([]models.User, 0, len(users))
+	for _, user := range users {
+		if hasAssignedGroup(currentUser.Group, user.Group) {
+			filtered = append(filtered, user)
+		}
+	}
+	return filtered
+}
+
+func hasAssignedGroup(assignedGroups, targetGroup string) bool {
+	for _, group := range strings.Split(assignedGroups, ",") {
+		group = strings.TrimSpace(group)
+		if group != "" && group == strings.TrimSpace(targetGroup) {
+			return true
+		}
+	}
+	return false
 }

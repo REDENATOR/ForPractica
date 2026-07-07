@@ -11,14 +11,16 @@ import (
 type Claims struct {
 	UserID uint   `json:"user_id"`
 	Role   string `json:"role"`
+	Group  string `json:"group"`
 	jwt.RegisteredClaims
 }
 
 // GenerateToken создаёт JWT
-func GenerateToken(userID uint, role string) (string, error) {
+func GenerateToken(userID uint, role, group string) (string, error) {
 	claims := Claims{
 		UserID: userID,
 		Role:   role,
+		Group:  group,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

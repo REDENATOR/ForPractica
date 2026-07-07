@@ -49,7 +49,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	// 4. Создаём пользователя (роль student по умолчанию)
 	user := models.User{
 		Fio:         req.Fio,
-		Group:       "default",
+		Group:       "",
 		PhoneNumber: req.PhoneNumber,
 		Password:    hashedPassword,
 		Role:        "student",
@@ -96,7 +96,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// 4. Генерируем JWT
-	token, err := utils.GenerateToken(user.ID, user.Role)
+	token, err := utils.GenerateToken(user.ID, user.Role, user.Group)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return

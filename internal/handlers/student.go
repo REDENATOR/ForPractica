@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // StudentHandler обрабатывает запросы, связанные со студентами.
@@ -23,26 +24,51 @@ func NewStudentHandler(svc *service.StudentService) *StudentHandler {
 	return &StudentHandler{svc: svc}
 }
 
-func (h *StudentHandler) authorizeSelfOrAdmin(c *gin.Context, targetUserID uint) bool {
-	currentUserID, ok := getCurrentUserID(c)
+func (h *StudentHandler) authorizeAccess(c *gin.Context, targetUser models.User) bool {
+	currentUser, ok := getCurrentUser(c)
 	if !ok {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return false
 	}
 
-	roleValue, exists := c.Get("role")
-	if !exists {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return false
-	}
-
-	roleStr, _ := roleValue.(string)
-	if roleStr == "admin" || currentUserID == targetUserID {
+	if h.svc.CanAccessUser(currentUser, targetUser) {
 		return true
 	}
 
 	c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden: insufficient permissions"})
 	return false
+}
+
+func getCurrentUser(c *gin.Context) (models.User, bool) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		return models.User{}, false
+	}
+
+	userID := uint(0)
+	switch v := userIDValue.(type) {
+	case uint:
+		userID = v
+	case int:
+		userID = uint(v)
+	case int64:
+		userID = uint(v)
+	case float64:
+		userID = uint(v)
+	default:
+		return models.User{}, false
+	}
+
+	roleValue, exists := c.Get("role")
+	if !exists {
+		return models.User{}, false
+	}
+
+	roleStr, _ := roleValue.(string)
+	groupValue, _ := c.Get("group")
+	groupStr, _ := groupValue.(string)
+
+	return models.User{Model: gorm.Model{ID: userID}, Role: roleStr, Group: groupStr}, true
 }
 
 func getCurrentUserID(c *gin.Context) (uint, bool) {
@@ -65,7 +91,7 @@ func getCurrentUserID(c *gin.Context) (uint, bool) {
 	}
 }
 
-// GetByID returns a student by ID.
+// GetByID возвращает студента по ID.
 func (h *StudentHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 
@@ -77,10 +103,6 @@ func (h *StudentHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	if !h.authorizeSelfOrAdmin(c, uint(id)) {
-		return
-	}
-
 	student, err := h.svc.GetByID(uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -89,10 +111,14 @@ func (h *StudentHandler) GetByID(c *gin.Context) {
 		return
 	}
 
+	if !h.authorizeAccess(c, student) {
+		return
+	}
+
 	c.JSON(http.StatusOK, student)
 }
 
-// Update updates an existing student by ID.
+// Update обновляет существующего студента по ID.
 func (h *StudentHandler) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
@@ -101,7 +127,13 @@ func (h *StudentHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if !h.authorizeSelfOrAdmin(c, uint(id)) {
+	student, err := h.svc.GetByID(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
+		return
+	}
+
+	if !h.authorizeAccess(c, student) {
 		return
 	}
 
@@ -111,7 +143,7 @@ func (h *StudentHandler) Update(c *gin.Context) {
 		return
 	}
 
-	student, err := h.svc.Update(uint(id), updatedStudent)
+	student, err = h.svc.Update(uint(id), updatedStudent)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 		return

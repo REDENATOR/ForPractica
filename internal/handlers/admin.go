@@ -34,20 +34,29 @@ func (h *AdminHandler) authorize(c *gin.Context) bool {
 	return true
 }
 
-// GetAll returns list of all students (admin only).
+// GetAll возвращает список всех студентов (только для администратора).
 func (h *AdminHandler) GetAll(c *gin.Context) {
 	if !h.authorize(c) {
 		return
 	}
+	currentUser, ok := getCurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	students, err := h.svc.GetAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if currentUser.Role == "teacher" {
+		students = h.svc.FilterVisibleUsers(currentUser, students)
+	}
 	c.JSON(http.StatusOK, students)
 }
 
-// Create creates a new student from JSON payload (admin only).
+// Create создаёт нового студента из JSON-данных (только для администратора).
 func (h *AdminHandler) Create(c *gin.Context) {
 	if !h.authorize(c) {
 		return
@@ -66,7 +75,7 @@ func (h *AdminHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, student)
 }
 
-// Delete removes a student by ID (admin only).
+// Delete удаляет студента по ID (только для администратора).
 func (h *AdminHandler) Delete(c *gin.Context) {
 	if !h.authorize(c) {
 		return
@@ -86,7 +95,7 @@ func (h *AdminHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Student deleted"})
 }
 
-// FilterByGroup returns students filtered by group (admin only).
+// FilterByGroup возвращает студентов, отфильтрованных по группе (только для администратора).
 func (h *AdminHandler) FilterByGroup(c *gin.Context) {
 	if !h.authorize(c) {
 		return
@@ -101,16 +110,25 @@ func (h *AdminHandler) FilterByGroup(c *gin.Context) {
 		return
 	}
 
+	currentUser, ok := getCurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	students, err := h.svc.FilterByGroup(group)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if currentUser.Role == "teacher" {
+		students = h.svc.FilterVisibleUsers(currentUser, students)
+	}
 
 	c.JSON(http.StatusOK, students)
 }
 
-// FilterByGroupOptional returns all students when group is not provided (admin only).
+// FilterByGroupOptional возвращает всех студентов, если группа не указана (только для администратора).
 func (h *AdminHandler) FilterByGroupOptional(c *gin.Context) {
 	if !h.authorize(c) {
 		return
@@ -118,16 +136,25 @@ func (h *AdminHandler) FilterByGroupOptional(c *gin.Context) {
 
 	group, _ := c.GetQuery("group")
 
+	currentUser, ok := getCurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	students, err := h.svc.FilterByGroupOptional(group)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if currentUser.Role == "teacher" {
+		students = h.svc.FilterVisibleUsers(currentUser, students)
+	}
 
 	c.JSON(http.StatusOK, students)
 }
 
-// GetPaginated returns a paginated student list (admin only).
+// GetPaginated возвращает постраничный список студентов (только для администратора).
 func (h *AdminHandler) GetPaginated(c *gin.Context) {
 	if !h.authorize(c) {
 		return
@@ -146,10 +173,29 @@ func (h *AdminHandler) GetPaginated(c *gin.Context) {
 		limit = 10
 	}
 
+	currentUser, ok := getCurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	students, total, err := h.svc.GetPaginated(page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if currentUser.Role == "teacher" {
+		students = h.svc.FilterVisibleUsers(currentUser, students)
+		total = int64(len(students))
+		if page*limit < len(students) {
+			end := (page + 1) * limit
+			if end > len(students) {
+				end = len(students)
+			}
+			students = students[page*limit : end]
+		} else {
+			students = []models.User{}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -160,7 +206,7 @@ func (h *AdminHandler) GetPaginated(c *gin.Context) {
 	})
 }
 
-// Search looks up students by group and name (admin only).
+// Search ищет студентов по группе и имени (только для администратора).
 func (h *AdminHandler) Search(c *gin.Context) {
 	if !h.authorize(c) {
 		return
@@ -169,10 +215,19 @@ func (h *AdminHandler) Search(c *gin.Context) {
 	group := c.Query("group")
 	name := c.Query("name")
 
+	currentUser, ok := getCurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	students, err := h.svc.Search(group, name)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if currentUser.Role == "teacher" {
+		students = h.svc.FilterVisibleUsers(currentUser, students)
 	}
 
 	c.JSON(http.StatusOK, students)
