@@ -1,6 +1,10 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // User представляет пользователя системы, например студента или преподавателя.
 type User struct {
@@ -14,4 +18,13 @@ type User struct {
 	PhoneNumber string `json:"phoneNumber"`
 	Password    string `json:"password"`
 	Role        string `gorm:"type:varchar(20);not null;default:'student'"`
+}
+type RefreshToken struct {
+	ID        uint      `gorm:"primaryKey"`
+	UserID    uint      `gorm:"not null;index"`
+	TokenHash string    `gorm:"unique;not null;size:64"`
+	ExpiresAt time.Time `gorm:"not null;index"`
+	CreatedAt time.Time `gorm:"autoCreateTime"`
+	Revoked   bool      `gorm:"default:false;index"`
+	User      User      `gorm:"foreignKey:UserID"`
 }

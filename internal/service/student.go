@@ -8,11 +8,11 @@ import (
 
 // StudentService содержит бизнес-логику доступа пользователей и операций со студентами.
 type StudentService struct {
-	repo *repository.UserRepository
+	repo repository.UserRepositoryInterface
 }
 
 // NewStudentService создаёт новый сервис студентов.
-func NewStudentService(repo *repository.UserRepository) *StudentService {
+func NewStudentService(repo repository.UserRepositoryInterface) *StudentService {
 	if repo == nil {
 		repo = &repository.UserRepository{}
 	}

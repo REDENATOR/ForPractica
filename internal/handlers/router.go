@@ -5,6 +5,7 @@ import (
 	"go-backend/internal/middlevare"
 	"go-backend/internal/repository"
 	"go-backend/internal/service"
+	"go-backend/internal/utils" // ← ДОБАВИТЬ
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -29,25 +30,30 @@ func (r *Router) RegisterRoutes() {
 	// ============================================
 	// 1. ПУБЛИЧНЫЕ МАРШРУТЫ (без токена)
 	// ============================================
-	authHandler := NewAuthHandler(r.db)
+	// ИНИЦИАЛИЗИРУЕМ JWTManager
+	jwtManager := utils.NewJWTManager() // ← ДОБАВИТЬ
+
+	// Передаем jwtManager в AuthHandler
+	authHandler := NewAuthHandler(r.db, jwtManager) // ← ИЗМЕНИТЬ
 	auth := r.engine.Group("/auth")
 	{
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
+		auth.POST("/refresh", authHandler.Refresh) // ← ДОБАВИТЬ
 	}
 
 	// ============================================
 	// 2. ЗАЩИЩЁННЫЕ МАРШРУТЫ (с токеном)
 	// ============================================
 	api := r.engine.Group("/api")
-	api.Use(middlevare.AuthMiddleware()) // ← все маршруты ниже проверяют токен
+	api.Use(middlevare.AuthMiddleware(jwtManager)) // ← ИЗМЕНИТЬ (передаем jwtManager)
 	{
 		repo := &repository.UserRepository{}
 		studentService := service.NewStudentService(repo)
 		studentHandler := NewStudentHandler(studentService)
 		adminHandler := NewAdminHandler(studentService)
 
-		// --- Роуты для работы со студентами (админ видит всех, преподаватель — только свои группы) ---
+		// --- Роуты для работы со студентами ---
 		api.GET("/students", middlevare.RoleMiddleware("admin", "teacher"), adminHandler.GetAll)
 		api.POST("/students", middlevare.RoleMiddleware("admin"), adminHandler.Create)
 		api.DELETE("/students/:id", middlevare.RoleMiddleware("admin"), adminHandler.Delete)
@@ -56,8 +62,11 @@ func (r *Router) RegisterRoutes() {
 		api.GET("/students/paginated", middlevare.RoleMiddleware("admin", "teacher"), adminHandler.GetPaginated)
 		api.GET("/students/search", middlevare.RoleMiddleware("admin", "teacher"), adminHandler.Search)
 
-		// --- Роуты для работы со студентами (студент может смотреть/редактировать только себя, админ — любого) ---
-		api.GET("/students/:id", studentHandler.GetByID) // проверка внутри хендлера
-		api.PUT("/students/:id", studentHandler.Update)  // проверка внутри хендлера
+		api.GET("/students/:id", studentHandler.GetByID)
+		api.PUT("/students/:id", studentHandler.Update)
+
+		// --- ДОБАВИТЬ РОУТЫ ДЛЯ LOGOUT ---
+		api.POST("/logout", authHandler.Logout)               // ← ДОБАВИТЬ
+		api.POST("/logout-all", authHandler.LogoutAllDevices) // ← ДОБАВИТЬ
 	}
 }
